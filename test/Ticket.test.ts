@@ -9,6 +9,7 @@ import { Ticket } from "../typechain-types";
   ? describe.skip
   : describe("Ticket", function () {
       const toWei = (num: Number) => ethers.parseEther(num.toString());
+      const toEth = (num: string) => ethers.formatEther(num);
 
       async function deployTicket() {
         const Ticket = await ethers.getContractFactory("Ticket");
@@ -61,6 +62,10 @@ import { Ticket } from "../typechain-types";
 
           const tokenId = await ticket.getAddressTokenId();
           console.log("user token Id: ", tokenId.toString());
+          const address = await ticket.getAddress();
+          const balance = await ethers.provider.getBalance(address);
+
+          assert.equal("0.0001", toEth(balance.toString()));
         });
 
         it("Failed Buy Ticket By Same Address", async function () {
@@ -110,6 +115,200 @@ import { Ticket } from "../typechain-types";
               value: toWei(0.00001),
             })
           ).to.be.revertedWith("Sold Out");
+        });
+      });
+
+      describe("Transfer Token", function () {
+        it("Token Is Not For Sale", async function () {
+          const ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+          
+          const signers = await ethers.getSigners();
+          const secondUser = signers[1];
+          const firstUser = signers[0];
+
+          const tokenId = await ticket.getAddressTokenId();
+          await expect(ticket.safeTransferFrom(firstUser.address, secondUser.address, tokenId))
+          .to.be.revertedWith("Token Is Not For Sale");
+        });
+
+        it("Failed Enable Token Transfer, Not Owner", async function () {
+          const ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+
+          const firstUserTokenId = await ticket.getAddressTokenId();
+          
+          //Use non deployer address to changet the sale status
+          const signers = await ethers.getSigners();
+          const secondUser = signers[1];
+          const secondTicket = await ticket.connect(secondUser);
+          secondTicket.enableSellingTicket(firstUserTokenId);
+
+          //use non deployer to enable selling ticket by token id
+          await expect(secondTicket.enableSellingTicket(firstUserTokenId))
+          .to.be.reverted;
+          //use non deployer to enable selling ticket all at once
+          await expect(secondTicket.enableSellingAllTicket())
+          .to.be.reverted;
+
+          const isTicketForSale = await secondTicket.getTokenTransferEnabledStatus(firstUserTokenId);
+          assert.equal(isTicketForSale, false);
+        });
+
+        it("Success Enable Token Transfer", async function () {
+          const ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+          
+          //Enable token sale using its token Id
+          const firstUserTokenId = await ticket.getAddressTokenId();
+          let isTokenForSale: boolean = await ticket.getTokenTransferEnabledStatus(firstUserTokenId);
+          assert.equal(isTokenForSale, false);
+          
+          await ticket.enableSellingTicket(firstUserTokenId);
+          isTokenForSale = await ticket.getTokenTransferEnabledStatus(firstUserTokenId);
+          assert.equal(isTokenForSale, true);
+          
+          //Enable token for sale all at once
+          const signers = await ethers.getSigners();
+          const secondUser = signers[1];
+          const secondTicket = await ticket.connect(secondUser);
+
+          await secondTicket.buyTicket("test2", "userId2", {
+            value: toWei(0.0001),
+          });
+          const secondUserTokenId = await secondTicket.getAddressTokenId();
+          await ticket.enableSellingAllTicket();
+
+          const isSecondTokenForSale = await secondTicket.getTokenTransferEnabledStatus(secondUserTokenId);
+          assert.equal(isTokenForSale, true);
+          assert.equal(isSecondTokenForSale, true);
+        });
+
+        it("Transfer Token Success", async function () {
+          const ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+          
+          const signers = await ethers.getSigners();
+          const secondUser = signers[1];
+          const firstUser = signers[0];
+
+          const tokenId = await ticket.getAddressTokenId();
+
+          await ticket.enableSellingTicket(tokenId);
+          await ticket.safeTransferFrom(firstUser.address, secondUser.address, tokenId);
+          
+          const firstUserUserTokenId = await ticket.getAddressTokenId();
+          const secondTicket = await ticket.connect(secondUser);
+          const secondUserTokenId = await secondTicket.getAddressTokenId();
+          
+          assert.equal(firstUserUserTokenId.toString(), "0");
+          assert.equal(secondUserTokenId.toString(), tokenId.toString());
+        });
+      });
+
+      describe("Verify Ticket", function () {
+        let ticket: Ticket & {
+          deploymentTransaction(): ContractTransactionResponse;
+        };
+
+        this.beforeAll(async function () {
+          ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+        });
+
+        it("Failed To Verify, Ticket Doesn't Exists", async function () {
+          await expect(ticket.verifyTicket("1")).to
+          .be.revertedWith("Token Doesn't Exists");
+        });
+
+        it("Failed To Verify, Not Owner", async function () {
+          const signers = await ethers.getSigners();
+          const secondUser = signers[1];
+          const secondTicket = await ticket.connect(secondUser);
+
+          const tokenId = await ticket.getAddressTokenId();
+          
+          await expect(secondTicket.verifyTicket(tokenId)).to
+          .be.revertedWith("Only Token Owner Can Run This Process");
+        });
+
+        it("Success To Verify Ticket", async function () {
+          const tokenId = await ticket.getAddressTokenId();
+          const totalTicketVerified = await ticket.getTicketVerified();
+          assert.equal(totalTicketVerified.toString(), "0");
+          await ticket.verifyTicket(tokenId);
+          
+          const updatedTotalTicketVerified = await ticket.getTicketVerified();
+          assert.equal(updatedTotalTicketVerified.toString(), "1");
+
+          const isTicketUsed = await ticket.getTokenUsedStatus(tokenId);
+          assert.equal(isTicketUsed, true);
+        });
+
+        it("Failed To Verify, Used Ticket", async function () {
+          const tokenId = await ticket.getAddressTokenId();
+          await expect(ticket.verifyTicket(tokenId)).to.be.revertedWith("Token Already Been Used");
+        });
+      });
+
+      describe("Withdraw", function () {
+        let ticket: Ticket & {
+          deploymentTransaction(): ContractTransactionResponse;
+        };
+
+        this.beforeAll(async function () {
+          ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+        });
+
+        it("Failed Withdraw, Not Owner", async function () {
+          const address = await ticket.getAddress();
+          const balance = await ethers.provider.getBalance(address);
+
+          assert.equal("0.0001", toEth(balance.toString()));
+
+          const signers = await ethers.getSigners();
+          const secondUser = signers[1];
+          const secondTicket = ticket.connect(secondUser);
+          
+          await expect(secondTicket.withdraw()).to.be.reverted;
+        });
+
+        it("Success Withdraw", async function () {
+          const signers = await ethers.getSigners();
+          const firstUser = signers[0];
+          const address = await ticket.getAddress();
+          const balance = await ethers.provider.getBalance(address);
+
+          assert.equal("0.0001", toEth(balance.toString()));
+
+          const userBalance = await ethers.provider.getBalance(firstUser.address);
+
+          const tx = await ticket.withdraw();
+          const receipt = await tx.wait();
+
+          const updatedBalance = await ethers.provider.getBalance(address);
+          assert.equal("0.0", toEth(updatedBalance.toString()));
+
+          const updatedUserBalance = await ethers.provider.getBalance(firstUser.address);
+          const gas = receipt!.gasPrice * receipt!.gasUsed;
+
+          const calculatedUserBalance = userBalance + balance - gas;
+
+          assert.equal(updatedUserBalance > userBalance, true);
+          assert.equal(updatedUserBalance, calculatedUserBalance);
         });
       });
     });
