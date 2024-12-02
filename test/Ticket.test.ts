@@ -4,7 +4,6 @@ import { assert, expect } from "chai";
 import { developmentChains } from "../hardhat-helper-config";
 import { ContractTransactionResponse } from "ethers";
 import { Ticket } from "../typechain-types";
-import { token } from "../typechain-types/@openzeppelin/contracts";
 
 !developmentChains.includes(network.name)
   ? describe.skip
