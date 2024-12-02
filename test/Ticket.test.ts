@@ -4,6 +4,7 @@ import { assert, expect } from "chai";
 import { developmentChains } from "../hardhat-helper-config";
 import { ContractTransactionResponse } from "ethers";
 import { Ticket } from "../typechain-types";
+import { token } from "../typechain-types/@openzeppelin/contracts";
 
 !developmentChains.includes(network.name)
   ? describe.skip
@@ -69,12 +70,14 @@ import { Ticket } from "../typechain-types";
         });
 
         it("Failed Buy Ticket By Same Address", async function () {
+          const signers = await ethers.getSigners();
+          const firstUser = signers[0];
           await expect(
             ticket.buyTicket("test", "userId2", {
               value: toWei(0.0001),
             })
-          ).to.be.revertedWith("User Account Address Has Been Used");
-        });
+          ).to.be.revertedWithCustomError(ticket, "Ticket_AddressIsUsed").withArgs(firstUser.address);
+        }); 
 
         it("Failed Buy Ticket By Same UserId", async function () {
           const signers = await ethers.getSigners();
@@ -84,7 +87,7 @@ import { Ticket } from "../typechain-types";
             secondTicket.buyTicket("test", "userId", {
               value: toWei(0.0001),
             })
-          ).to.be.revertedWith("User ID Card Number Has Been Used");
+          ).to.be.revertedWithCustomError(ticket, "Ticket_UserIdCardIsUsed").withArgs(secondUser.address);
         });
 
         it("Failed Buy Ticket With Insufficient Amount", async function () {
@@ -95,7 +98,7 @@ import { Ticket } from "../typechain-types";
             secondTicket.buyTicket("test", "userId2", {
               value: toWei(0.00001),
             })
-          ).to.be.revertedWith("Insufficient Balance To Buy The Ticket");
+          ).to.be.revertedWithCustomError(ticket, "Ticket_InsufficientBalance");
         });
 
         it("Failed Buy Ticket Because of Sold Out", async function () {
@@ -114,7 +117,7 @@ import { Ticket } from "../typechain-types";
             thirdTicket.buyTicket("test", "userId2", {
               value: toWei(0.00001),
             })
-          ).to.be.revertedWith("Sold Out");
+          ).to.be.revertedWithCustomError(ticket, "Ticket_SoldOut");
         });
       });
 
@@ -131,7 +134,7 @@ import { Ticket } from "../typechain-types";
 
           const tokenId = await ticket.getAddressTokenId();
           await expect(ticket.safeTransferFrom(firstUser.address, secondUser.address, tokenId))
-          .to.be.revertedWith("Token Is Not For Sale");
+          .to.be.revertedWithCustomError(ticket, "Ticket_NotForSale").withArgs(tokenId);
         });
 
         it("Failed Enable Token Transfer, Not Owner", async function () {
@@ -146,7 +149,6 @@ import { Ticket } from "../typechain-types";
           const signers = await ethers.getSigners();
           const secondUser = signers[1];
           const secondTicket = await ticket.connect(secondUser);
-          secondTicket.enableSellingTicket(firstUserTokenId);
 
           //use non deployer to enable selling ticket by token id
           await expect(secondTicket.enableSellingTicket(firstUserTokenId))
@@ -157,6 +159,19 @@ import { Ticket } from "../typechain-types";
 
           const isTicketForSale = await secondTicket.getTokenTransferEnabledStatus(firstUserTokenId);
           assert.equal(isTicketForSale, false);
+        });
+
+        it("Failed Enable Token Transfer, Already Enabled", async function () {
+          const ticket = await loadFixture(deployTicket);
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+
+          const tokenId = await ticket.getAddressTokenId();
+          await ticket.enableSellingTicket(tokenId);
+
+          //enable it again with error expected
+          await expect(ticket.enableSellingTicket(tokenId)).to.be.revertedWithCustomError(ticket, "Ticket_AlreadyEnabledForSale").withArgs(tokenId);
         });
 
         it("Success Enable Token Transfer", async function () {
@@ -228,7 +243,7 @@ import { Ticket } from "../typechain-types";
 
         it("Failed To Verify, Ticket Doesn't Exists", async function () {
           await expect(ticket.verifyTicket("1")).to
-          .be.revertedWith("Token Doesn't Exists");
+          .be.revertedWithCustomError(ticket, "Ticket_DoesNotExist").withArgs("1");
         });
 
         it("Failed To Verify, Not Owner", async function () {
@@ -239,7 +254,7 @@ import { Ticket } from "../typechain-types";
           const tokenId = await ticket.getAddressTokenId();
           
           await expect(secondTicket.verifyTicket(tokenId)).to
-          .be.revertedWith("Only Token Owner Can Run This Process");
+          .be.revertedWithCustomError(ticket, "Ticket_NotTokenOwner").withArgs(tokenId, secondUser.address);
         });
 
         it("Success To Verify Ticket", async function () {
@@ -257,7 +272,7 @@ import { Ticket } from "../typechain-types";
 
         it("Failed To Verify, Used Ticket", async function () {
           const tokenId = await ticket.getAddressTokenId();
-          await expect(ticket.verifyTicket(tokenId)).to.be.revertedWith("Token Already Been Used");
+          await expect(ticket.verifyTicket(tokenId)).to.be.revertedWithCustomError(ticket, "Ticket_IsUsed").withArgs(tokenId);
         });
       });
 
@@ -268,17 +283,13 @@ import { Ticket } from "../typechain-types";
 
         this.beforeAll(async function () {
           ticket = await loadFixture(deployTicket);
-          await ticket.buyTicket("test", "userId", {
-            value: toWei(0.0001),
-          });
+        });
+
+        it("Failed Withdraw, No Funds", async function (){
+          await expect(ticket.withdraw()).to.be.revertedWithCustomError(ticket, "Ticket_NoFunds");
         });
 
         it("Failed Withdraw, Not Owner", async function () {
-          const address = await ticket.getAddress();
-          const balance = await ethers.provider.getBalance(address);
-
-          assert.equal("0.0001", toEth(balance.toString()));
-
           const signers = await ethers.getSigners();
           const secondUser = signers[1];
           const secondTicket = ticket.connect(secondUser);
@@ -287,6 +298,10 @@ import { Ticket } from "../typechain-types";
         });
 
         it("Success Withdraw", async function () {
+          await ticket.buyTicket("test", "userId", {
+            value: toWei(0.0001),
+          });
+          
           const signers = await ethers.getSigners();
           const firstUser = signers[0];
           const address = await ticket.getAddress();

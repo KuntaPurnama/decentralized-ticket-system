@@ -6,11 +6,24 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+//Describe the error code
+error Ticket_SoldOut();
+error Ticket_AddressIsUsed(address sender);
+error Ticket_UserIdCardIsUsed(address sender);
+error Ticket_InsufficientBalance();
+error Ticket_NotForSale(uint256 tokenId);
+error Ticket_AlreadyEnabledForSale(uint256 tokenId);
+error Ticket_DoesNotExist(uint256 tokenId);
+error Ticket_IsUsed(uint256 tokenId);
+error Ticket_NotTokenOwner(uint256 tokenId, address sender);
+error Ticket_NoFunds();
+
 /**
  * @title decentralized ticket system
  * @author Tano
  * @notice This contract is to implement secure and seamless decentralized ticket system
- * @dev this implements ERC721 token protocol to tokenize the ticket
+ * @dev this implements ERC721 token protocol to tokenize the ticket, use Ownable to implement only owner validation
+ * and use ReetrancyGuard to prevent malicious action when sending ETH using the contract
  */
 contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
     //state variable
@@ -48,21 +61,23 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
         string memory userIdCard
     ) external payable nonReentrant {
         //Validate the request
-        require(s_ticketSold < s_totalTickets, "Sold Out");
-        require(
-            !s_userAddressUsed[msg.sender],
-            "User Account Address Has Been Used"
-        );
-        require(
-            msg.value >= s_ticketPrice,
-            "Insufficient Balance To Buy The Ticket"
-        );
+        if (s_ticketSold >= s_totalTickets) {
+            revert Ticket_SoldOut();
+        }
+
+        if (s_userAddressUsed[msg.sender]) {
+            revert Ticket_AddressIsUsed(msg.sender);
+        }
+
+        if (msg.value < s_ticketPrice) {
+            revert Ticket_InsufficientBalance();
+        }
 
         bytes32 hashedUserId = keccak256(abi.encodePacked(userIdCard));
-        require(
-            !s_userIdCardUsed[hashedUserId],
-            "User ID Card Number Has Been Used"
-        );
+
+        if (s_userIdCardUsed[hashedUserId]) {
+            revert Ticket_UserIdCardIsUsed(msg.sender);
+        }
 
         //Mark the address and id card number used by requester
         s_userAddressUsed[msg.sender] = true;
@@ -106,7 +121,9 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
         uint256 tokenId
     ) public override(ERC721, IERC721) {
         // Call the internal safe transfer function
-        require(s_tokenIsForSale[tokenId], "Token Is Not For Sale");
+        if (!s_tokenIsForSale[tokenId]) {
+            revert Ticket_NotForSale(tokenId);
+        }
 
         s_addressToTokenId[from] = 0;
         s_addressToTokenId[to] = tokenId;
@@ -118,7 +135,9 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
      * @dev create function to enable the ticket selling based on the tokenId but only the contract owner can access it
      */
     function enableSellingTicket(uint256 tokenId) external onlyOwner {
-        require(!s_tokenIsForSale[tokenId], "Token already been enabled");
+        if (s_tokenIsForSale[tokenId]) {
+            revert Ticket_AlreadyEnabledForSale(tokenId);
+        }
         s_tokenIsForSale[tokenId] = true;
     }
 
@@ -137,9 +156,17 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
      */
     function verifyTicket(uint256 tokenId) external {
         address owner = _ownerOf(tokenId);
-        require(owner != address(0), "Token Doesn't Exists");
-        require(owner == msg.sender, "Only Token Owner Can Run This Process");
-        require(!s_tokenIdUsed[tokenId], "Token Already Been Used");
+        if (owner == address(0)) {
+            revert Ticket_DoesNotExist(tokenId);
+        }
+
+        if (owner != msg.sender) {
+            revert Ticket_NotTokenOwner(tokenId, msg.sender);
+        }
+
+        if (s_tokenIdUsed[tokenId]) {
+            revert Ticket_IsUsed(tokenId);
+        }
 
         s_ticketVerified++;
         s_tokenIdUsed[tokenId] = true;
@@ -150,7 +177,9 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
      */
     function withdraw() external onlyOwner nonReentrant {
         uint256 balance = address(this).balance;
-        require(balance > 0, "No funds to withdraw");
+        if (balance <= 0) {
+            revert Ticket_NoFunds();
+        }
 
         payable(owner()).transfer(balance);
     }
