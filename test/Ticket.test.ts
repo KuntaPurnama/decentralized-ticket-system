@@ -136,7 +136,7 @@ import { Ticket } from "../typechain-types";
 
           const tokenId = await ticket.getAddressTokenId();
           await expect(ticket.safeTransferFrom(firstUser.address, secondUser.address, tokenId))
-          .to.be.revertedWithCustomError(ticket, "Ticket_NotForSale").withArgs(tokenId);
+          .to.be.revertedWithCustomError(ticket, "Ticket_NotForSale").withArgs(firstUser.address);
         });
 
         it("Failed Enable Token Transfer, Not Owner", async function () {
@@ -173,7 +173,7 @@ import { Ticket } from "../typechain-types";
           await ticket.enableSellingTicket(tokenId);
 
           //enable it again with error expected
-          await expect(ticket.enableSellingTicket(tokenId)).to.be.revertedWithCustomError(ticket, "Ticket_AlreadyEnabledForSale").withArgs(tokenId);
+          await expect(ticket.enableSellingTicket(tokenId)).to.be.revertedWithCustomError(ticket, "Ticket_AlreadyEnabledForSale");
         });
 
         it("Success Enable Token Transfer", async function () {
@@ -244,26 +244,30 @@ import { Ticket } from "../typechain-types";
         });
 
         it("Failed To Verify, Ticket Doesn't Exists", async function () {
-          await expect(ticket.verifyTicket("1")).to
-          .be.revertedWithCustomError(ticket, "Ticket_DoesNotExist").withArgs("1");
-        });
-
-        it("Failed To Verify, Not Owner", async function () {
           const signers = await ethers.getSigners();
           const secondUser = signers[1];
           const secondTicket = await ticket.connect(secondUser);
 
-          const tokenId = await ticket.getAddressTokenId();
-          
-          await expect(secondTicket.verifyTicket(tokenId)).to
-          .be.revertedWithCustomError(ticket, "Ticket_NotTokenOwner").withArgs(tokenId, secondUser.address);
+          await expect(secondTicket.verifyTicket()).to
+          .be.revertedWithCustomError(ticket, "Ticket_DoesNotExist").withArgs(secondUser.address);
         });
+
+        // it("Failed To Verify, Not Owner", async function () {
+        //   const signers = await ethers.getSigners();
+        //   const secondUser = signers[1];
+        //   const secondTicket = await ticket.connect(secondUser);
+
+        //   const tokenId = await ticket.getAddressTokenId();
+          
+        //   await expect(secondTicket.verifyTicket(tokenId)).to
+        //   .be.revertedWithCustomError(ticket, "Ticket_NotTokenOwner").withArgs(tokenId, secondUser.address);
+        // });
 
         it("Success To Verify Ticket", async function () {
           const tokenId = await ticket.getAddressTokenId();
           const totalTicketVerified = await ticket.getTicketVerified();
           assert.equal(totalTicketVerified.toString(), "0");
-          await ticket.verifyTicket(tokenId);
+          await ticket.verifyTicket();
           
           const updatedTotalTicketVerified = await ticket.getTicketVerified();
           assert.equal(updatedTotalTicketVerified.toString(), "1");
@@ -274,7 +278,9 @@ import { Ticket } from "../typechain-types";
 
         it("Failed To Verify, Used Ticket", async function () {
           const tokenId = await ticket.getAddressTokenId();
-          await expect(ticket.verifyTicket(tokenId)).to.be.revertedWithCustomError(ticket, "Ticket_IsUsed").withArgs(tokenId);
+          const signers = await ethers.getSigners();
+          const firstUser = signers[0];
+          await expect(ticket.verifyTicket()).to.be.revertedWithCustomError(ticket, "Ticket_IsUsed").withArgs(firstUser.address);
         });
       });
 

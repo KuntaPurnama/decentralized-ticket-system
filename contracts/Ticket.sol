@@ -11,11 +11,11 @@ error Ticket_SoldOut();
 error Ticket_AddressIsUsed(address sender);
 error Ticket_UserIdCardIsUsed(address sender);
 error Ticket_InsufficientBalance();
-error Ticket_NotForSale(uint256 tokenId);
-error Ticket_AlreadyEnabledForSale(uint256 tokenId);
-error Ticket_DoesNotExist(uint256 tokenId);
-error Ticket_IsUsed(uint256 tokenId);
-error Ticket_NotTokenOwner(uint256 tokenId, address sender);
+error Ticket_NotForSale(address sender);
+error Ticket_AlreadyEnabledForSale();
+error Ticket_DoesNotExist(address sender);
+error Ticket_IsUsed(address sender);
+error Ticket_NotTokenOwner(address sender);
 error Ticket_NoFunds();
 
 /**
@@ -122,7 +122,7 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
     ) public override(ERC721, IERC721) {
         // Call the internal safe transfer function
         if (!s_tokenIsForSale[tokenId]) {
-            revert Ticket_NotForSale(tokenId);
+            revert Ticket_NotForSale(msg.sender);
         }
 
         s_addressToTokenId[from] = 0;
@@ -136,7 +136,7 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
      */
     function enableSellingTicket(uint256 tokenId) external onlyOwner {
         if (s_tokenIsForSale[tokenId]) {
-            revert Ticket_AlreadyEnabledForSale(tokenId);
+            revert Ticket_AlreadyEnabledForSale();
         }
         s_tokenIsForSale[tokenId] = true;
     }
@@ -154,18 +154,20 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
     /**
      * @dev We need to verify the token(ticket). Verify that the sender really own the token
      */
-    function verifyTicket(uint256 tokenId) external {
+    function verifyTicket() external {
+        uint256 tokenId = s_addressToTokenId[msg.sender];
         address owner = _ownerOf(tokenId);
-        if (owner == address(0)) {
-            revert Ticket_DoesNotExist(tokenId);
+
+        if (owner == address(0) || tokenId == 0) {
+            revert Ticket_DoesNotExist(msg.sender);
         }
 
         if (owner != msg.sender) {
-            revert Ticket_NotTokenOwner(tokenId, msg.sender);
+            revert Ticket_NotTokenOwner(msg.sender);
         }
 
         if (s_tokenIdUsed[tokenId]) {
-            revert Ticket_IsUsed(tokenId);
+            revert Ticket_IsUsed(msg.sender);
         }
 
         s_ticketVerified++;
