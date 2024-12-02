@@ -49,13 +49,16 @@ import { Ticket } from "../typechain-types";
 
         it("Success Buy ticket", async function () {
           const ticketSold = await ticket.getTicketSold();
+          const signer = await ethers.getSigners();
+          const sender = signer[0];
+          
           assert(ticketSold.toString(), "0");
 
           expect(
             await ticket.buyTicket("test", "userId", {
               value: toWei(0.0001),
             })
-          ).to.emit(ticket, "SuccessBuyTicket");
+          ).to.emit(ticket, "SuccessBuyTicket").withArgs(sender.address);
 
           const updatedTicketSold = await ticket.getTicketSold();
           assert(updatedTicketSold.toString(), "1");
