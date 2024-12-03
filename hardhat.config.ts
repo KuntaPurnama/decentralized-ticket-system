@@ -9,6 +9,8 @@ const SEPOLIA_RPC_URL: string =
 const SEPOLIA_PRIVATE_KEY: string =
   process.env.SEPOLIA_PRIVATE_KEY ||
   "0000000000000000000000000000000000000000000000000000000000000000";
+const ETHERSCAN_API_KEY =
+  process.env.ETHERSCAN_API_KEY || "0000000000000000000000000000000000";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -29,6 +31,9 @@ const config: HardhatUserConfig = {
       chainId: 31337,
       allowUnlimitedContractSize: true,
     },
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY,
   },
   namedAccounts: {
     deployer: {
