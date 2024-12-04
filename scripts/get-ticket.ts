@@ -22,7 +22,7 @@ async function createOrder() {
     );
 
     console.log("token id: ", tokenId.toString());
-    console.log("ticket used before verify: ", isTicketUsedBefore);
+    console.log("ticket used: ", isTicketUsedBefore);
 
     console.log(
       "========================Success get ticket========================"
