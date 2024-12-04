@@ -21,6 +21,7 @@
     "ethereum-waffle": "^4.0.10",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.1",
+    "fs": "^0.0.1-security",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

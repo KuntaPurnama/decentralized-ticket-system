@@ -82,6 +82,9 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
         //Mark the address and id card number used by requester
         s_userAddressUsed[msg.sender] = true;
         s_userIdCardUsed[hashedUserId] = true;
+        
+        //Increment the ticket sold
+        s_ticketSold++;
 
         //Make sure uniqueness of token id by hashing the combination of user id, sender address, timestamp, and number of ticket sold
         uint256 tokenId = uint256(
@@ -104,9 +107,6 @@ contract Ticket is ERC721URIStorage, Ownable, ReentrancyGuard {
 
         //Attach the Metadata
         _setTokenURI(tokenId, tokenURI);
-
-        //Increment the ticket sold
-        s_ticketSold++;
 
         //Emit the success event
         emit SuccessBuyTicket(msg.sender);

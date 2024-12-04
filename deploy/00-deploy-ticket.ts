@@ -8,6 +8,7 @@ import { developmentChains } from "../hardhat-helper-config";
 import { network } from "hardhat";
 
 import { verify } from "../utils/verify";
+import fs from "fs";
 
 const deployTickets: DeployFunction = async function ({
   getNamedAccounts,
@@ -33,6 +34,8 @@ const deployTickets: DeployFunction = async function ({
     await verify(contract.address, args);
   }
 
+  const addressData = `export const TicketAddress = '${contract.address}';\n`;
+  fs.writeFileSync("./contract-address.ts", addressData);
   log(`---------------------Deploy Finished --------------------\n`);
 };
 
