@@ -1,17 +1,11 @@
 {
   "name": "hardhat-project",
   "devDependencies": {
-    "@nomicfoundation/hardhat-ignition": "^0.15.8",
-    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.0",
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@nomicfoundation/ignition-core": "^0.15.8",
-    "hardhat": "^2.19.4",
-    "hardhat-deploy": "^0.12.4"
-  },
-  "dependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@openzeppelin/contracts": "^5.0.1",
     "@typechain/ethers-v6": "^0.5.0",
@@ -20,12 +14,17 @@
     "@types/mocha": ">=9.1.0",
     "@types/sinon-chai": "^3.2.3",
     "chai": "^4.2.0",
-    "dotenv": "^16.4.5",
     "ethereum-waffle": "^4.0.10",
     "fs": "^0.0.1-security",
+    "hardhat": "^2.19.4",
+    "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4"
   }
 }
