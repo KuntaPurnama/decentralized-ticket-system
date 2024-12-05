@@ -20,7 +20,7 @@ error Ticket_NoFunds();
 
 /**
  * @title decentralized ticket system
- * @author Tano
+ * @author Kunta Purnama
  * @notice This contract is to implement secure and seamless decentralized ticket system
  * @dev this implements ERC721 token protocol to tokenize the ticket, use Ownable to implement only owner validation
  * and use ReetrancyGuard to prevent malicious action when sending ETH using the contract
